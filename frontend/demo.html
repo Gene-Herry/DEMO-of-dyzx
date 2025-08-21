@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+  <meta charset="UTF-8">
+  <title>Demo 后端登录</title>
+</head>
+<body>
+  <h2>DEMO 登录页（Cloudflare Workers版）</h2>
+  <form id="loginForm">
+    <label>账号：<input name="username"></label><br>
+    <label>密码：<input name="password" type="password"></label><br>
+    <button type="submit">登录</button>
+  </form>
+  <div id="errMsg" style="color:red"></div>
+  <script>
+    document.getElementById('loginForm').onsubmit = async function(ev){
+      ev.preventDefault();
+      const username = this.username.value.trim();
+      const password = this.password.value;
+      // 向后端API发POST
+      const resp = await fetch('/api/login', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({username, password})
+      });
+      const res = await resp.json();
+      if(res.ok){
+        // 存储登录状态（本地会话存储，简单明文）
+        sessionStorage.setItem('loginedUser', res.username);
+        // 跳转到dashboard
+        location.href = '/dashboard.html';
+      }else{
+        document.getElementById('errMsg').innerText = res.error || '登录失败';
+      }
+    }
+  </script>
+</body>
+</html>
