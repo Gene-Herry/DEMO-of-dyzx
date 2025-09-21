@@ -38,7 +38,7 @@ export default {
                     throw new Error('数据库未绑定，请在 Pages 设置中绑定 D1 数据库');
                 }
                 
-                // 创建表（如果不存在）
+                // 创建表（如果不存在）- 添加grade字段
                 await env.DB.prepare(`
                     CREATE TABLE IF NOT EXISTS records (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,7 +75,7 @@ export default {
                     throw new Error('数据库未绑定，请检查 D1 绑定配置');
                 }
                 
-                // 首先尝试创建表（如果不存在）- 包含新的grade字段
+                // 首先尝试创建表（如果不存在）- 添加grade字段
                 await env.DB.prepare(`
                     CREATE TABLE IF NOT EXISTS records (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -87,7 +87,7 @@ export default {
                     )
                 `).run();
                 
-                // 检查是否需要添加grade列（为了兼容旧数据）
+                // 尝试添加grade列（为了兼容旧数据）
                 try {
                     await env.DB.prepare(`ALTER TABLE records ADD COLUMN grade TEXT`).run();
                 } catch (e) {
@@ -126,23 +126,11 @@ export default {
                 
                 const data = await request.json();
                 
-                // 验证数据
+                // 验证数据 - 添加grade验证
                 if (!data.date || !data.grade || !data.department || !data.content) {
                     return new Response(JSON.stringify({ 
                         error: '缺少必填字段',
-                        required: ['date', 'grade', 'department', 'content'],
                         received: data 
-                    }), {
-                        status: 400,
-                        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                    });
-                }
-                
-                // 验证年级值
-                if (!['高一', '高二'].includes(data.grade)) {
-                    return new Response(JSON.stringify({ 
-                        error: '年级必须是"高一"或"高二"',
-                        received: data.grade 
                     }), {
                         status: 400,
                         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -198,54 +186,7 @@ export default {
             }
         }
         
-        // 获取统计数据
-        if (url.pathname === '/api/stats' && request.method === 'GET') {
-            try {
-                if (!env.DB) {
-                    throw new Error('数据库未绑定');
-                }
-                
-                // 总记录数
-                const totalResult = await env.DB.prepare(
-                    'SELECT COUNT(*) as count FROM records'
-                ).first();
-                
-                // 今日记录数
-                const today = new Date().toISOString().split('T')[0];
-                const todayResult = await env.DB.prepare(
-                    'SELECT COUNT(*) as count FROM records WHERE date = ?'
-                ).bind(today).first();
-                
-                // 部门统计
-                const departmentResult = await env.DB.prepare(
-                    'SELECT department, COUNT(*) as count FROM records GROUP BY department'
-                ).all();
-                
-                // 年级统计
-                const gradeResult = await env.DB.prepare(
-                    'SELECT grade, COUNT(*) as count FROM records WHERE grade IS NOT NULL GROUP BY grade'
-                ).all();
-                
-                return new Response(JSON.stringify({
-                    total: totalResult?.count || 0,
-                    today: todayResult?.count || 0,
-                    byDepartment: departmentResult.results || [],
-                    byGrade: gradeResult.results || []
-                }), {
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                });
-            } catch (error) {
-                return new Response(JSON.stringify({ 
-                    error: error.message,
-                    stack: error.stack 
-                }), {
-                    status: 500,
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                });
-            }
-        }
-        
-        // 4040
+        // 404
         return new Response('Not Found', { status: 404, headers: corsHeaders });
     }
 };
