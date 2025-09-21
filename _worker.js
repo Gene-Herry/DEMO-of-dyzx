@@ -38,12 +38,11 @@ export default {
                     throw new Error('数据库未绑定，请在 Pages 设置中绑定 D1 数据库');
                 }
                 
-                // 创建表（如果不存在）- 添加grade字段
+                // 创建表（如果不存在）
                 await env.DB.prepare(`
                     CREATE TABLE IF NOT EXISTS records (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         date TEXT NOT NULL,
-                        grade TEXT NOT NULL,
                         department TEXT NOT NULL,
                         content TEXT NOT NULL,
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -75,24 +74,16 @@ export default {
                     throw new Error('数据库未绑定，请检查 D1 绑定配置');
                 }
                 
-                // 首先尝试创建表（如果不存在）- 添加grade字段
+                // 首先尝试创建表（如果不存在）
                 await env.DB.prepare(`
                     CREATE TABLE IF NOT EXISTS records (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         date TEXT NOT NULL,
-                        grade TEXT NOT NULL,
                         department TEXT NOT NULL,
                         content TEXT NOT NULL,
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                     )
                 `).run();
-                
-                // 尝试添加grade列（为了兼容旧数据）
-                try {
-                    await env.DB.prepare(`ALTER TABLE records ADD COLUMN grade TEXT`).run();
-                } catch (e) {
-                    // 列已存在，忽略错误
-                }
                 
                 const result = await env.DB.prepare(
                     'SELECT * FROM records ORDER BY created_at DESC'
@@ -126,8 +117,8 @@ export default {
                 
                 const data = await request.json();
                 
-                // 验证数据 - 添加grade验证
-                if (!data.date || !data.grade || !data.department || !data.content) {
+                // 验证数据
+                if (!data.date || !data.department || !data.content) {
                     return new Response(JSON.stringify({ 
                         error: '缺少必填字段',
                         received: data 
@@ -138,8 +129,8 @@ export default {
                 }
                 
                 const result = await env.DB.prepare(
-                    'INSERT INTO records (date, grade, department, content) VALUES (?, ?, ?, ?)'
-                ).bind(data.date, data.grade, data.department, data.content).run();
+                    'INSERT INTO records (date, department, content) VALUES (?, ?, ?)'
+                ).bind(data.date, data.department, data.content).run();
                 
                 return new Response(JSON.stringify({ 
                     success: true, 
