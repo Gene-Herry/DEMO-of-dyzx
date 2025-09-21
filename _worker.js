@@ -245,7 +245,7 @@ export default {
             }
         }
         
-        // 404
+        // 4040
         return new Response('Not Found', { status: 404, headers: corsHeaders });
     }
 };
