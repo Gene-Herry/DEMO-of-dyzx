@@ -2,32 +2,108 @@ export default {
     async fetch(request, env) {
         const url = new URL(request.url);
         
+        // CORS 头部设置
+        const corsHeaders = {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+        };
+        
+        // 处理 OPTIONS 请求
+        if (request.method === 'OPTIONS') {
+            return new Response(null, { headers: corsHeaders });
+        }
+        
         // 处理静态文件
         if (url.pathname === '/' || !url.pathname.startsWith('/api')) {
             return env.ASSETS.fetch(request);
         }
         
-        // API 路由
+        // API 健康检查
         if (url.pathname === '/api/health') {
-            return new Response(JSON.stringify({ status: 'ok', time: new Date().toISOString() }), {
-                headers: { 'Content-Type': 'application/json' }
+            return new Response(JSON.stringify({ 
+                status: 'ok', 
+                time: new Date().toISOString(),
+                hasDB: !!env.DB,
+                env: Object.keys(env)
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
+        }
+        
+        // 数据库初始化检查和创建表
+        if (url.pathname === '/api/init' && request.method === 'GET') {
+            try {
+                if (!env.DB) {
+                    throw new Error('数据库未绑定，请在 Pages 设置中绑定 D1 数据库');
+                }
+                
+                // 创建表（如果不存在）
+                await env.DB.prepare(`
+                    CREATE TABLE IF NOT EXISTS records (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        date TEXT NOT NULL,
+                        department TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                `).run();
+                
+                return new Response(JSON.stringify({ 
+                    success: true, 
+                    message: '数据库表创建成功' 
+                }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            } catch (error) {
+                return new Response(JSON.stringify({ 
+                    error: error.message,
+                    stack: error.stack 
+                }), {
+                    status: 500,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
         }
         
         // 获取所有记录
         if (url.pathname === '/api/records' && request.method === 'GET') {
             try {
+                // 检查数据库是否绑定
+                if (!env.DB) {
+                    throw new Error('数据库未绑定，请检查 D1 绑定配置');
+                }
+                
+                // 首先尝试创建表（如果不存在）
+                await env.DB.prepare(`
+                    CREATE TABLE IF NOT EXISTS records (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        date TEXT NOT NULL,
+                        department TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                `).run();
+                
                 const result = await env.DB.prepare(
                     'SELECT * FROM records ORDER BY created_at DESC'
                 ).all();
                 
-                return new Response(JSON.stringify({ records: result.results }), {
-                    headers: { 'Content-Type': 'application/json' }
+                return new Response(JSON.stringify({ 
+                    records: result.results || [],
+                    count: result.results ? result.results.length : 0
+                }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                 });
             } catch (error) {
-                return new Response(JSON.stringify({ error: error.message }), {
+                console.error('数据库查询错误:', error);
+                return new Response(JSON.stringify({ 
+                    error: error.message,
+                    stack: error.stack,
+                    type: 'DATABASE_ERROR'
+                }), {
                     status: 500,
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                 });
             }
         }
@@ -35,13 +111,20 @@ export default {
         // 添加新记录
         if (url.pathname === '/api/records' && request.method === 'POST') {
             try {
+                if (!env.DB) {
+                    throw new Error('数据库未绑定');
+                }
+                
                 const data = await request.json();
                 
                 // 验证数据
                 if (!data.date || !data.department || !data.content) {
-                    return new Response(JSON.stringify({ error: '缺少必填字段' }), {
+                    return new Response(JSON.stringify({ 
+                        error: '缺少必填字段',
+                        received: data 
+                    }), {
                         status: 400,
-                        headers: { 'Content-Type': 'application/json' }
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                     });
                 }
                 
@@ -53,12 +136,15 @@ export default {
                     success: true, 
                     id: result.meta.last_row_id 
                 }), {
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                 });
             } catch (error) {
-                return new Response(JSON.stringify({ error: error.message }), {
+                return new Response(JSON.stringify({ 
+                    error: error.message,
+                    stack: error.stack 
+                }), {
                     status: 500,
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                 });
             }
         }
@@ -67,6 +153,10 @@ export default {
         const deleteMatch = url.pathname.match(/^\/api\/records\/(\d+)$/);
         if (deleteMatch && request.method === 'DELETE') {
             try {
+                if (!env.DB) {
+                    throw new Error('数据库未绑定');
+                }
+                
                 const id = parseInt(deleteMatch[1]);
                 
                 await env.DB.prepare(
@@ -74,17 +164,20 @@ export default {
                 ).bind(id).run();
                 
                 return new Response(JSON.stringify({ success: true }), {
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                 });
             } catch (error) {
-                return new Response(JSON.stringify({ error: error.message }), {
+                return new Response(JSON.stringify({ 
+                    error: error.message,
+                    stack: error.stack 
+                }), {
                     status: 500,
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                 });
             }
         }
         
         // 404
-        return new Response('Not Found', { status: 404 });
+        return new Response('Not Found', { status: 404, headers: corsHeaders });
     }
 };
