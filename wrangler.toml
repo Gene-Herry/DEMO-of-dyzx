@@ -1,0 +1,11 @@
+name = "shared-data-system"
+main = "_worker.js"
+compatibility_date = "2024-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ws"
+database_id = "f4d35050-f005-40f0-81ca-5f64c8b3d0a7"  # 创建D1时会显示
+
+[site]
+bucket = "./"
