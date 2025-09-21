@@ -357,13 +357,6 @@
             color: #333;
         }
         
-        /* 两列布局 */
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-        
         @media (max-width: 768px) {
             .container {
                 padding: 15px;
@@ -389,10 +382,6 @@
             .stats {
                 grid-template-columns: 1fr;
             }
-            
-            .form-row {
-                grid-template-columns: 1fr;
-            }
         }
     </style>
 </head>
@@ -416,10 +405,6 @@
                 <div class="stat-value" id="departmentCount">0</div>
                 <div class="stat-label">部门数量</div>
             </div>
-            <div class="stat-item">
-                <div class="stat-value" id="gradeCount">0</div>
-                <div class="stat-label">年级数量</div>
-            </div>
         </div>
         
         <div class="form-section">
@@ -429,25 +414,18 @@
                     <input type="date" id="date" required>
                 </div>
                 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="grade">年级 *</label>
-                        <select id="grade" required>
-                            <option value="">请选择年级</option>
-                            <option value="高一">高一</option>
-                            <option value="高二">高二</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="department">部门 *</label>
-                        <select id="department" required>
-                            <option value="">请选择部门</option>
-                            <option value="卫生">卫生</option>
-                            <option value="纪律">纪律</option>
-                            <option value="体育">体育</option>
-                        </select>
-                    </div>
+                <div class="form-group">
+                    <label for="department">部门 *</label>
+                    <select id="department" required>
+                        <option value="">请选择部门</option>
+                        <option value="高二卫生">高二卫生</option>
+                        <option value="高二纪律">高二纪律</option>
+                        <option value="高二体育">高二体育</option>
+                        <option value="高一卫生">高一卫生</option>
+                        <option value="高一纪律">高一纪律</option>
+                        <option value="高一体育">高一体育</option>
+
+                    </select>
                 </div>
                 
                 <div class="form-group">
@@ -480,7 +458,6 @@
                         <tr>
                             <th>序号</th>
                             <th>日期</th>
-                            <th>年级</th>
                             <th>部门</th>
                             <th>数据内容</th>
                             <th>录入时间</th>
@@ -564,12 +541,10 @@
             const today = new Date().toISOString().split('T')[0];
             const todayRecords = dataList.filter(r => r.date === today);
             const departments = [...new Set(dataList.map(r => r.department))];
-            const grades = [...new Set(dataList.map(r => r.grade).filter(g => g))]; // 过滤掉空值
             
             document.getElementById('totalCount').textContent = dataList.length;
             document.getElementById('todayCount').textContent = todayRecords.length;
             document.getElementById('departmentCount').textContent = departments.length;
-            document.getElementById('gradeCount').textContent = grades.length;
         }
         
         // 表单提交处理
@@ -583,7 +558,6 @@
             
             const formData = {
                 date: document.getElementById('date').value,
-                grade: document.getElementById('grade').value,
                 department: document.getElementById('department').value,
                 content: document.getElementById('content').value.trim()
             };
@@ -638,7 +612,6 @@
                 row.innerHTML = `
                     <td>${index + 1}</td>
                     <td>${record.date}</td>
-                    <td>${record.grade || '-'}</td>
                     <td>${record.department}</td>
                     <td class="content-preview">${escapeHtml(record.content)}</td>
                     <td>${createdAt}</td>
@@ -660,7 +633,6 @@
                 
                 modalBody.innerHTML = `
                     <p><strong>日期:</strong> ${record.date}</p>
-                    <p><strong>年级:</strong> ${record.grade || '-'}</p>
                     <p><strong>部门:</strong> ${record.department}</p>
                     <p><strong>录入时间:</strong> ${new Date(record.created_at).toLocaleString('zh-CN')}</p>
                     <p><strong>内容:</strong></p>
