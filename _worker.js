@@ -130,7 +130,19 @@ export default {
                 if (!data.date || !data.grade || !data.department || !data.content) {
                     return new Response(JSON.stringify({ 
                         error: '缺少必填字段',
+                        required: ['date', 'grade', 'department', 'content'],
                         received: data 
+                    }), {
+                        status: 400,
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                    });
+                }
+                
+                // 验证年级值
+                if (!['高一', '高二'].includes(data.grade)) {
+                    return new Response(JSON.stringify({ 
+                        error: '年级必须是"高一"或"高二"',
+                        received: data.grade 
                     }), {
                         status: 400,
                         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -171,3 +183,69 @@ export default {
                 await env.DB.prepare(
                     'DELETE FROM records WHERE id = ?'
                 ).bind(id).run();
+                
+                return new Response(JSON.stringify({ success: true }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            } catch (error) {
+                return new Response(JSON.stringify({ 
+                    error: error.message,
+                    stack: error.stack 
+                }), {
+                    status: 500,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+        }
+        
+        // 获取统计数据
+        if (url.pathname === '/api/stats' && request.method === 'GET') {
+            try {
+                if (!env.DB) {
+                    throw new Error('数据库未绑定');
+                }
+                
+                // 总记录数
+                const totalResult = await env.DB.prepare(
+                    'SELECT COUNT(*) as count FROM records'
+                ).first();
+                
+                // 今日记录数
+                const today = new Date().toISOString().split('T')[0];
+                const todayResult = await env.DB.prepare(
+                    'SELECT COUNT(*) as count FROM records WHERE date = ?'
+                ).bind(today).first();
+                
+                // 部门统计
+                const departmentResult = await env.DB.prepare(
+                    'SELECT department, COUNT(*) as count FROM records GROUP BY department'
+                ).all();
+                
+                // 年级统计
+                const gradeResult = await env.DB.prepare(
+                    'SELECT grade, COUNT(*) as count FROM records WHERE grade IS NOT NULL GROUP BY grade'
+                ).all();
+                
+                return new Response(JSON.stringify({
+                    total: totalResult?.count || 0,
+                    today: todayResult?.count || 0,
+                    byDepartment: departmentResult.results || [],
+                    byGrade: gradeResult.results || []
+                }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            } catch (error) {
+                return new Response(JSON.stringify({ 
+                    error: error.message,
+                    stack: error.stack 
+                }), {
+                    status: 500,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+        }
+        
+        // 404
+        return new Response('Not Found', { status: 404, headers: corsHeaders });
+    }
+};
